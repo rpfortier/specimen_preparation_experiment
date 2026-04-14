@@ -13,7 +13,7 @@ All R scripts run successfully using R software version 4.5.0 on Windows 11 and 
   + Global plant trait data summarized from the TRY plant trait database.
 * trees_collected.csv
   + Tree metadata including voucher numbers and species identities.
-* dry_hyperspectral_data.csv
+* dry_hyperspectral_data.csv (download at https://drive.google.com/file/d/1RB4lgGDJq6RVxMK8nTmfETZSyqNUEiSe/view?usp=drive_link)
   + Reflectance values across the entire spectrum (350 nm - 2500 nm) for the abaxial and adaxial side of each leaf.
 
 ## *R scripts*
