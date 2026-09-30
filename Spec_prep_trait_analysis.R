@@ -3,8 +3,7 @@
 ### due to alcohol/drying treatments. 
 
 # set working directory
-setwd("C:/Users/rfortier/Dropbox/MBG Postdoc/Specimen prep/Data analysis")
-#setwd("~/Library/CloudStorage/Dropbox/MBG Postdoc/Specimen prep/Data analysis")
+#setwd("your/path/here")
 
 # Load libraries
 library(readxl)
@@ -223,7 +222,7 @@ anova_summary <- map_dfr(traits, function(trait) {
 
 #write.csv(anova_summary, file = "TableS3.csv", row.names = FALSE)
 
-### GLMMs ###
+### LMMs ###
 # First a global model
 global_plots  <- list()
 global_models <- list()
@@ -236,7 +235,7 @@ for (trait in traits) {
   ### Correlation between dry and fresh measurements with treatments as fixed effects
   m <- lmer(as.formula(paste(dry_trait, "~", fresh_trait, " + dry_treatment + alcohol_treatment ",
                              "+", fresh_trait, " : dry_treatment", "+", fresh_trait,  " : alcohol_treatment", 
-                             "+ (1 | Species/voucher_no)")),
+                             "+ (1 | voucher_no)")),
             data = leaf_traits)
   summary <- summary(m)
   p_val <- coef(summary)[fresh_trait, "Pr(>|t|)"]
@@ -305,7 +304,7 @@ for (trait in traits) {
   m <- lmer(as.formula(paste(dry_trait, "~", fresh_trait,
                              "+ (1 | dry_treatment)",
                              "+ (1 | alcohol_treatment)",
-                             "+ (1 | Species/voucher_no)")),
+                             "+ (1 | voucher_no)")),
             data = leaf_traits)
   
   summary <- summary(m)
@@ -330,22 +329,26 @@ names(vc_table) <- c("trait", "grouping_factor", "variance", "pct_total_var")
 rownames(vc_table) <- NULL
 
 # Reorder grouping factors 
-vc_table$grouping_factor <- factor(vc_table$grouping_factor, levels = c("alcohol_treatment", "dry_treatment", "Species", "voucher_no:Species", "Residual"), ordered = T)
-vc_table$trait <- factor(vc_table$trait, levels = c("thickness", "LMA", "ELW", "area", "length"), ordered = T)
+vc_table$grouping_factor <- factor(vc_table$grouping_factor, levels = c("alcohol_treatment", "dry_treatment", "voucher_no", "Residual"), ordered = TRUE)
+vc_table$trait <- factor(vc_table$trait, levels = c("thickness", "LMA", "ELW", "area", "length"), ordered = TRUE)
 # Multiply variance by 1000 for thickness to put it on a larger scale to be able to actually interpret the values
 vc_table$variance <- ifelse(vc_table$trait == "thickness", vc_table$variance * 1000, vc_table$variance)
 vc_table$variance <- round(vc_table$variance, 3)
 #write.csv(vc_table, "TableS5.csv", row.names = FALSE)
 
 #Plot variance components
+fills <- c("alcohol_treatment" = "#E15759", "dry_treatment" = "#EDC948", "voucher_no" = "#5AA14F", "voucher_no:Species" = "#4D6047", "Residual" = "#4E79A7")
 ggplot(vc_table, aes(x = trait, y = pct_total_var, fill = grouping_factor)) +
   geom_bar(stat = "identity", position = "stack", color = "black") +
-  scale_fill_paletteer_d("LaCroixColoR::KeyLime", name = "Random effect") +
+  scale_fill_manual(values = fills, name = "Source") +
   labs(y = "% of Total Variance",
        x = "Leaf Trait") +
   theme_bw() +
   theme(legend.position = "right",
-        axis.text.x = element_text(angle = 45, hjust = 1))
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10),
+        axis.text.x = element_text(angle = 45, hjust = 1, size = 12),
+        axis.title = element_text(size = 14))
 
 
 #########################
@@ -372,14 +375,16 @@ spectral_data_long <- dry_leaf_all %>%
   pivot_longer(cols = starts_with("Wavelength_"),
                names_to = "wavelength_col",
                values_to = "reflectance") %>%
-  mutate(wavelength = as.numeric(str_remove(wavelength_col, "Wavelength_")))
+  mutate(wavelength = as.numeric(str_remove(wavelength_col, "Wavelength_"))) %>%
+  mutate(alcohol_treatment = factor(alcohol_treatment,
+                                    levels = c("control", "alcohol", "extra alcohol"),
+                                    ordered = FALSE))
 
-spectral_data_long <- spectral_data_long %>%
-  mutate(alcohol_treatment = factor(alcohol_treatment, 
-                               levels = c("control", "alcohol", "extra alcohol"),
-                               ordered = FALSE))
+leaf_mean_spectra <- spectral_data_long %>%
+  group_by(voucher_no, dry_treatment, alcohol_treatment, treatment_code, leaf, wavelength) %>%
+  summarise(reflectance = mean(reflectance, na.rm = TRUE), .groups = "drop")
 
-spectral_summary <- spectral_data_long %>%
+spectral_summary <- leaf_mean_spectra %>%
   group_by(dry_treatment, alcohol_treatment, wavelength) %>%
   summarise(
     mean_reflectance = mean(reflectance, na.rm = TRUE),
@@ -401,15 +406,18 @@ ggplot(spectral_summary, aes(x = wavelength, y = mean_reflectance, color = alcoh
        y = "Mean reflectance",
        colour = "Alcohol treatment",
        fill   = "Alcohol treatment") +
+  scale_fill_paletteer_d("ggthemes::Tableau_10") +
+  scale_color_paletteer_d("ggthemes::Tableau_10") +
   theme_bw(base_size = 14) +
   theme(legend.position = "top")
 
 ### Test for differences in mean reflectance at each wavelength.
-# Run an anova at each wavelength to test for a treatment effect on mean reflectance
-wavelength_mean_tests <- spectral_data_long %>%
+# Run lmer at each wavelength to test for a treatment effect on mean reflectance
+wavelength_mean_tests <- leaf_mean_spectra %>%
   group_by(wavelength) %>%
   do({
-    model <- aov(reflectance ~ dry_treatment * alcohol_treatment, data = .)
+    model <- lmer(reflectance ~ dry_treatment * alcohol_treatment + (1 | voucher_no),
+      data = .)
     aov_result <- anova(model)
     tibble(
       drying_F = aov_result["dry_treatment", "F value"],
@@ -455,10 +463,10 @@ ggplot(anova_plot_data, aes(wavelength, -log10(p_adj))) +
   annotate("rect", fill = "gray95", alpha = 0.7, xmin = 700, xmax = 1100, ymin = -Inf, ymax = Inf) +
   annotate("rect", fill = "gray75", alpha = 0.7, xmin = 1100, xmax = 2000, ymin = -Inf, ymax = Inf) +
   annotate("rect", fill = "gray55", alpha = 0.7, xmin = 2000, xmax = 2500, ymin = -Inf, ymax = Inf) +
-  annotate("text", x = 550, y = 40, label = "VIS", size = 4) +
-  annotate("text", x = 900, y = 40, label = "NIR", size = 4) +
-  annotate("text", x = 1550, y = 40, label = "SWIR 1", size = 4) +
-  annotate("text", x = 2250, y = 40, label = "SWIR 2", size = 4) +
+  annotate("text", x = 550, y = 70, label = "VIS", size = 4) +
+  annotate("text", x = 900, y = 70, label = "NIR", size = 4) +
+  annotate("text", x = 1550, y = 70, label = "SWIR 1", size = 4) +
+  annotate("text", x = 2250, y = 70, label = "SWIR 2", size = 4) +
   geom_line(linewidth = 0.8) +
   facet_wrap(~ term, ncol = 1) +
   geom_hline(yintercept = -log10(0.05),
@@ -493,13 +501,13 @@ sig_ribbons <- wavelength_mean_tests %>%
 ggplot(wavelength_mean_tests, aes(x = wavelength)) +
   # Add shaded regions for significance
   geom_ribbon(data = sig_ribbons, 
-              aes(ymin = 0, ymax = ifelse(sig_drying == 1, 40, 0)),
-              fill = "blue", alpha = 0.2) +
+              aes(ymin = 0, ymax = ifelse(sig_alcohol == 1, 25, 0)),
+              fill = "red", alpha = 0.4) +
   geom_ribbon(data = sig_ribbons, 
-              aes(ymin = 0, ymax = ifelse(sig_alcohol == 1, 40, 0)),
-              fill = "red", alpha = 0.2) +
+              aes(ymin = ifelse(sig_drying == 1, 25, 0), ymax = ifelse(sig_drying == 1, 50, 0)),
+              fill = "blue", alpha = 0.4) +
   geom_ribbon(data = sig_ribbons, 
-              aes(ymin = 0, ymax = ifelse(sig_interaction == 1, 40, 0)),
+              aes(ymin = ifelse(sig_interaction == 1, 50, 0), ymax = ifelse(sig_interaction == 1, 75, 0)),
               fill = "purple", alpha = 0.4) +
   # Plot -log10(p) values
   geom_line(aes(y = -log10(drying_p_adj), color = "Drying"), linewidth = 1) +
@@ -516,10 +524,10 @@ ggplot(wavelength_mean_tests, aes(x = wavelength)) +
   theme(legend.position = "top")
 
 # Now pairwise contrasts to see if different concentrations of alcohol affect spectra
-contrast_results <- spectral_data_long %>%
+contrast_results <- leaf_mean_spectra %>%
   group_by(wavelength) %>%
   do({
-    fit <- aov(reflectance ~ dry_treatment + alcohol_treatment, data = .)
+    fit <- lmer(reflectance ~ dry_treatment + alcohol_treatment + (1 | voucher_no), data = .)
     
     ## Estimated marginal means
     em_alc <- emmeans(fit, ~ alcohol_treatment)
@@ -572,26 +580,73 @@ ggplot(contrast_results, aes(wavelength, -log10(p_adj))) +
 #############################
 ########## PermANOVA ########
 
-# Make spectral matrix
-spec_matrix <- dry_leaf_all %>% select(all_of(wavelength_cols_trimmed))
+# First average the spectra per leaf
+dry_leaf_avg <- dry_leaf_all %>%
+  group_by(voucher_no, dry_treatment, alcohol_treatment, treatment_code, leaf, Species) %>%
+  summarise(across(all_of(wavelength_cols_trimmed), ~ mean(.x, na.rm = TRUE)),
+            .groups = "drop")
 
-# Compute bray-curtis distance on the matrix
-dist_bc <- vegdist(spec_matrix, method = "bray")
+# Make spectral matrix from leaf-averaged data
+spec_matrix <- dry_leaf_avg %>% select(all_of(wavelength_cols_trimmed))
+
+# Compute euclidean distance on the matrix
+dist_bc <- vegdist(spec_matrix, method = "euclidean")
 
 perm_dry <- adonis2(
   dist_bc ~ dry_treatment * alcohol_treatment,
-  data         = dry_leaf_all,
+  data         = dry_leaf_avg,
   permutations = 999,
   by           = "terms",
-  strata       = dry_leaf_all$voucher_no)
+  strata       = dry_leaf_avg$voucher_no)
 summary(perm_dry)
 #write.csv(perm_dry, file = "TableS6.csv")
 
+# Homogeneity of multivariate dispersion (PERMDISP)
+bd_dry <- betadisper(dist_bc, dry_leaf_avg$dry_treatment) #drying treatment
+pt_dry <- permutest(bd_dry, permutations = 999)
+
+bd_alc <- betadisper(dist_bc, dry_leaf_avg$alcohol_treatment) #alcohol treatment
+pt_alc <- permutest(bd_alc, permutations = 999)
+
+# Make supplementary table of the PERMDISP
+bd_dry_tidy <- data.frame(
+  Treatment = c("Drying treatment", "Residuals"),
+  Df        = pt_dry$tab$Df,
+  SS        = round(pt_dry$tab$`Sum Sq`, 4),
+  MS        = round(pt_dry$tab$`Mean Sq`, 4),
+  F         = c(round(pt_dry$tab$F[1], 3), NA),
+  `p-value` = c(ifelse(pt_dry$tab$`Pr(>F)`[1] < 0.001, "<0.001",
+                       round(pt_dry$tab$`Pr(>F)`[1], 3)), NA),
+  check.names = FALSE
+)
+
+bd_alc_tidy <- data.frame(
+  Treatment = c("Alcohol treatment", "Residuals"),
+  Df        = pt_alc$tab$Df,
+  SS        = round(pt_alc$tab$`Sum Sq`, 4),
+  MS        = round(pt_alc$tab$`Mean Sq`, 4),
+  F         = c(round(pt_alc$tab$F[1], 3), NA),
+  `p-value` = c(ifelse(pt_alc$tab$`Pr(>F)`[1] < 0.001, "<0.001",
+                       round(pt_alc$tab$`Pr(>F)`[1], 3)), NA),
+  check.names = FALSE
+)
+
+# Combine with blank separator row
+dispersion_table <- bind_rows(
+  bd_dry_tidy,
+  data.frame(Treatment = NA, Df = NA, SS = NA, MS = NA,
+             `F` = NA, `p-value` = NA, check.names = FALSE),
+  bd_alc_tidy
+)
+
+#write.csv(dispersion_table, file = "TableS7.csv", row.names = FALSE, na = "")
+
+# NMDS ordination
 nmds_dry <- metaMDS(dist_bc, k = 2, trymax = 100, trace = FALSE)
 nmds_dry$stress
 
 nmds_scores <- as.data.frame(scores(nmds_dry, display = "sites")) %>%
-  bind_cols(dry_leaf_all %>% select(dry_treatment, alcohol_treatment, Species))
+  bind_cols(dry_leaf_avg %>% select(dry_treatment, alcohol_treatment, Species))
 
 ggplot(nmds_scores, aes(x = NMDS1, y = NMDS2,
                         color = alcohol_treatment,
@@ -627,6 +682,7 @@ deriv_wavelength_cols <- c(
   paste0("Deriv_Wavelength_", 451:2400),
   paste0("Deriv2_Wavelength_", 452:2400)
 )
+
 
 
 
