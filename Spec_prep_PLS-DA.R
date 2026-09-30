@@ -4,8 +4,7 @@
 ### required dataframes and pre-process reflectance spectra.                                     ###
 
 # set working directory
-setwd("C:/Users/rfortier/Dropbox/MBG Postdoc/Specimen prep/Data analysis")
-#setwd("~/Library/CloudStorage/Dropbox/MBG Postdoc/Specimen prep/Data analysis")
+setwd("your/path/here")
 
 # Run initial script if not already run 
 #source("Spec_prep_trait_analysis.R")
