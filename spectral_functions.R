@@ -140,23 +140,23 @@ compute_hyperspectral_derivatives <- function(data,
 }
 
 ########################################################################################
-### The remaining functions are taken from Kothari et al. (2023)
+### The remaining functions are modified from Kothari et al. (2023)
 ### https://github.com/ShanKothari/pressed-leaf-models/blob/main/00%20useful_functions.R
 ###
 
-## root mean squared deviation
-RMSD<-function(measured,predicted){
+## root mean squared error
+RMSE<-function(measured,predicted){
   not.na<-which(!is.na(measured) & !is.na(predicted))
   return(sqrt(sum((measured-predicted)^2,na.rm=T)/(length(not.na)-1)))
 }
 
-## percent RMSD (based on data quantiles)
+## percent RMSE (based on data quantiles)
 ## set min and max to 0 and 1 for range as denominator
 ## or to 0.25 and 0.75 for IQR as denominator
-percentRMSD<-function(measured,predicted,min,max,na.rm=T){
-  RMSD_data<-RMSD(measured,predicted)
+percentRMSE<-function(measured,predicted,min,max,na.rm=T){
+  RMSE_data<-RMSE(measured,predicted)
   range<-unname(quantile(measured,probs=max,na.rm=na.rm)-quantile(measured,probs=min,na.rm=na.rm))
-  return(RMSD_data/range)
+  return(RMSE_data/range)
 }
 
 ## applying coefficients to validation spectra
@@ -175,5 +175,3 @@ apply.coefs<-function(coef.list,val.spec,intercept=T){
     pred.matrix<-as.matrix(val.spec) %*% t(coef.matrix)
   }
 }
-
-
