@@ -4,8 +4,7 @@
 ### required dataframes and process reflectance spectra.                                         ###
 
 # Set Working directory
-setwd("C:/Users/rfortier/Dropbox/MBG Postdoc/Specimen prep/Data analysis")
-#setwd("~/Library/CloudStorage/Dropbox/MBG Postdoc/Specimen prep/Data analysis")
+#setwd("your/path/here")
 
 # Load more libraries
 library(caret)
@@ -91,8 +90,8 @@ for(iteration in 1:niterations) {
       iteration = iteration,
       trait = trait,
       R2 = summary(val_fit)$r.squared,
-      RMSE = RMSD(Y_val, val_pred),
-      perRMSE = percentRMSD(Y_val, val_pred, 0.025, 0.975),
+      RMSE = RMSE(Y_val, val_pred),
+      perRMSE = percentRMSE(Y_val, val_pred, 0.025, 0.975),
       bias = mean(val_pred, na.rm = TRUE) - mean(Y_val, na.rm = TRUE),
       ncomp = ncomp
     ))
@@ -167,11 +166,11 @@ global_plots <- ggplot(global_pred_summary, aes(x = mean_predicted, y = measured
   geom_errorbar(aes(xmin = mean_predicted - sd_predicted,
                     xmax = mean_predicted + sd_predicted),
                 alpha = .3, colour = "grey50") +
-  geom_point(alpha = .6, size = 2) +
+  geom_point(alpha = .4, size = 2) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed",
-              colour = "red", linewidth = 1) +
+              colour = "tomato", linewidth = 1) +
   geom_smooth(method = "lm", se = TRUE,
-              colour = "blue", linewidth = 1) +
+              colour = "steelblue", linewidth = 1) +
   geom_text(data = facet_stats,
             aes(x = -Inf, y = Inf,
                 label = paste0("Mean R² = ", round(R2, 2),
@@ -179,12 +178,17 @@ global_plots <- ggplot(global_pred_summary, aes(x = mean_predicted, y = measured
             hjust = -.05, vjust = 1.1, size = 4,
             inherit.aes = FALSE) +
   facet_wrap(~trait, scales = "free") +
-  labs(x = "", y = "",
-       title = "Global model") +
-  theme_bw()
+  labs(x = "Predicted value", y = "Measured value",
+       title = "A) PLSR trait prediction") +
+  theme_bw() +
+  theme(plot.title = element_text(size = 16, face = "bold"),
+        plot.title.position = "plot",
+        axis.title = element_text(size = 14),
+        strip.background = element_rect(color="white", fill="white"),
+        strip.text = element_text(size = 12, color = "black", face = "bold"))
 
 # Make supplementary table of PLSR model results
-#write.csv(global_summary, file = "TableS7.csv", row.names = F)
+#write.csv(global_summary, file = "TableS8.csv", row.names = F)
 
 ### Global model rarefied down to 5 leaves per tree - "mixed-treatment" model ###
 # Add a code for each leaf
@@ -256,8 +260,8 @@ for(iteration in 1:niterations) {
       iteration = iteration,
       trait = trait,
       R2 = summary(val_fit)$r.squared,
-      RMSE = RMSD(Y_val, val_pred),
-      perRMSE = percentRMSD(Y_val, val_pred, 0.025, 0.975),
+      RMSE = RMSE(Y_val, val_pred),
+      perRMSE = percentRMSE(Y_val, val_pred, 0.025, 0.975),
       bias = mean(val_pred, na.rm = TRUE) - mean(Y_val, na.rm = TRUE),
       ncomp = ncomp
     ))
@@ -329,7 +333,7 @@ facet_stats_mix <- global_mix_stats_df %>%
   )
 facet_stats_mix$treatment <- "mixed"
 
-mix_plots <- ggplot(global_mix_pred_summary, aes(x = mean_predicted, y = measured)) +
+ggplot(global_mix_pred_summary, aes(x = mean_predicted, y = measured)) +
   geom_errorbar(aes(xmin = mean_predicted - sd_predicted,
                     xmax = mean_predicted + sd_predicted),
                 alpha = .3, colour = "grey50") +
@@ -348,11 +352,6 @@ mix_plots <- ggplot(global_mix_pred_summary, aes(x = mean_predicted, y = measure
   labs(x = "", y = "",
        title = "Mixed-treatment") +
   theme_bw()
-
-global_mix_plots <- ggarrange(plotlist = c(global_plots, mix_plots), ncol = 1, nrow = 2) 
-annotate_figure(p = global_mix_plots, left = text_grob("Measured value", rot = 90, vjust = 1, size = 14),
-                bottom = text_grob("Predicted value",vjust = -0.5, size = 14))
-
 
 ### Treatment specific models
 # Combine the two alcohol treatments for all subsequent analyses
@@ -469,8 +468,8 @@ for(t in 1:nrow(treatment_combos)) {
         treatment = treatment_label,
         trait = trait,
         R2 = summary(val_fit)$r.squared,
-        RMSE = RMSD(Y_val, val_pred),
-        perRMSE = percentRMSD(Y_val, val_pred, 0.025, 0.975),
+        RMSE = RMSE(Y_val, val_pred),
+        perRMSE = percentRMSE(Y_val, val_pred, 0.025, 0.975),
         bias = mean(val_pred, na.rm = TRUE) - mean(Y_val, na.rm = TRUE),
         ncomp = ncomp
       ))
@@ -512,7 +511,7 @@ treatment_summary <- treatment_stats_df %>%
   ) %>%
   mutate(across(where(is.numeric), ~round(.x, 3))) 
   
-#write.csv(treatment_summary, file = "TableS7b.csv", row.names = F)
+#write.csv(treatment_summary, file = "TableS8b.csv", row.names = F)
 
 # Create a plot for each treatment combination
 # Summarize predictions: mean and SD for each specimen across iterations
@@ -600,18 +599,25 @@ cld_r2 <- do.call(rbind, r2_cld_list)
 cld_r2 <- cld_r2 %>%
   mutate(treatment = factor(treatment, levels = c("mixed", "control_control", "extra dry_control", "control_alcohol", "extra dry_alcohol")))
 
+treatment_fills <- c("mixed" = "#4E79A7", "control_control" = "#FFEFB6", "extra dry_control" = "#EDC948", "control_alcohol" = "#FFADAD", "extra dry_alcohol" = "#E15859")
+fill_labels <- c(
+  "mixed"              = "Mixed",
+  "control_control"    = "Dc - Ac",
+  "extra dry_control"  = "De - Ac",
+  "control_alcohol"    = "Dc - A50/80",
+  "extra dry_alcohol"  = "De - A50/80")
 
 a <- ggplot(treatment_stats_df, aes(x = trait, y = R2, fill = treatment)) +
-  geom_boxplot(alpha = 0.7) +
-  geom_text(data = cld_r2, aes(x = trait, y = y_pos, label = Letters, group = treatment),
+  geom_boxplot(alpha = 1) +
+  geom_text(data = cld_r2,
+            aes(x = trait, y = y_pos, label = Letters, group = treatment),
             position = position_dodge(width = 0.75),
             vjust = -0.5, size = 4, fontface = "bold", inherit.aes = FALSE) +
   theme_classic(base_size = 14) +
-  labs(x = "", y = "R²", fill = "Treatment") +
+  labs(x = "", y = "R²", fill = "Model") +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.2))) +
-  scale_fill_discrete(labels = c("Mixed", "Dc - Ac", "De - Ac", "Dc - A50/80", "De - A50/80")) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        legend.position = "bottom")
+  scale_fill_manual(values = treatment_fills, labels = fill_labels) +
+  theme(legend.position = "bottom")
 
 rmse_cld_list <- list()
 
@@ -635,17 +641,16 @@ for(tr in unique(treatment_stats_df$trait)) {
 cld_rmse <- do.call(rbind, rmse_cld_list)
 
 b <- ggplot(treatment_stats_df, aes(x = trait, y = perRMSE, fill = treatment)) +
-  geom_boxplot(alpha = 0.7) +
-  geom_text(data = cld_rmse, aes(x = trait, y = y_pos, label = Letters, group = treatment),
+  geom_boxplot(alpha = 1) +
+  geom_text(data = cld_rmse,
+            aes(x = trait, y = y_pos, label = Letters, group = treatment),
             position = position_dodge(width = 0.75),
             vjust = -0.5, size = 4, fontface = "bold", inherit.aes = FALSE) +
   theme_classic(base_size = 14) +
-  labs(x = "Trait", y = "%RMSE", fill = "Treatment") +
+  labs(x = "Trait prediction", y = "%RMSE", fill = "Model") +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.2))) +
-  scale_fill_discrete(labels = c("Mixed", "Dc - Ac", "De - Ac", "Dc - A50/80", "De - A50/80")) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
-        legend.position = "bottom")
-ggarrange(plotlist = c(a,b), nrow = 2, ncol = 1, common.legend = TRUE)
+  scale_fill_manual(values = treatment_fills, labels = fill_labels) +
+  theme(legend.position = "bottom")
 
 ## treatment transfer models##
 # Define  transfer scenarios
@@ -805,8 +810,8 @@ for(scenario_idx in seq_along(transfer_scenarios)) {
         test_treatment = test_treatment,
         trait = trait,
         R2 = summary(test_fit)$r.squared,
-        RMSE = RMSD(Y_test, test_pred),
-        perRMSE = percentRMSD(Y_test, test_pred, 0.025, 0.975),
+        RMSE = RMSE(Y_test, test_pred),
+        perRMSE = percentRMSE(Y_test, test_pred, 0.025, 0.975),
         bias = mean(test_pred, na.rm = TRUE) - mean(Y_test, na.rm = TRUE),
         ncomp = ncomp
       ))
@@ -849,7 +854,7 @@ transfer_summary <- transfer_summary %>%
          test_treatment = factor(test_treatment, levels = c("control", "extra dry", "alcohol")))
 transfer_summary <- transfer_summary %>%
   arrange(train_treatment, test_treatment)
-#write.csv(transfer_summary, file = "TableS8.csv", row.names = F)
+#write.csv(transfer_summary, file = "TableS9.csv", row.names = F)
 
 # Summarize predictions: mean and SD for each specimen across iterations
 transfer_pred_summary <- transfer_predictions_df %>%
@@ -937,7 +942,7 @@ transfer_stats_df <- rbind(transfer_stats_df, global_mix_stats_df2)
 # Define level order and labels
 scenario_levels <- c("Mixed", "control to extra dry", "extra dry to control", 
                      "control to alcohol",   "alcohol to control")
-scenario_labels <- c("Mixed", "Dc to De", "De to Dc", "Ac to A50/80", "A50/80 to Ac")
+scenario_labels <- c("Mixed", "DC to DE", "DE to DC", "AC to A50/80", "A50/80 to AC")
 
 transfer_stats_df <- transfer_stats_df %>%
   mutate(scenario = factor(scenario, levels = scenario_levels))
@@ -964,8 +969,10 @@ for(tr in unique(transfer_stats_df$trait)) {
 }
 transfer_cld_r2 <- do.call(rbind, transfer_r2_cld_list)
 
+transfer_fills <- c("Mixed" = "#4E79A7", "control to extra dry" = "#AAECA1", "extra dry to control" = "#59A14F", "control to alcohol" = "#F3BBE3", "alcohol to control" = "#B07AA1")
+
 tc_a <- ggplot(transfer_stats_df, aes(x = trait, y = R2, fill = scenario)) +
-  geom_boxplot(alpha = 0.7) +
+  geom_boxplot() +
   geom_text(data = transfer_cld_r2,
             aes(x = trait, y = y_pos, label = Letters, group = scenario),
             position = position_dodge(width = 0.75),
@@ -973,8 +980,8 @@ tc_a <- ggplot(transfer_stats_df, aes(x = trait, y = R2, fill = scenario)) +
   theme_classic(base_size = 14) +
   labs(x = "", y = "R²", fill = "Scenario") +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.2))) +
-  scale_fill_discrete(labels = scenario_labels) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+  scale_fill_manual(values = transfer_fills, labels = scenario_labels) +
+  theme(axis.text.x = element_text(),
         legend.position = "bottom")
 
 # %RMSE ANOVA
@@ -1000,16 +1007,16 @@ for(tr in unique(transfer_stats_df$trait)) {
 transfer_cld_rmse <- do.call(rbind, transfer_rmse_cld_list)
 
 tc_b <- ggplot(transfer_stats_df, aes(x = trait, y = perRMSE, fill = scenario)) +
-  geom_boxplot(alpha = 0.7) +
+  geom_boxplot() +
   geom_text(data = transfer_cld_rmse,
             aes(x = trait, y = y_pos, label = Letters, group = scenario),
             position = position_dodge(width = 0.75),
             vjust = -0.5, size = 4, fontface = "bold", inherit.aes = FALSE) +
   theme_classic(base_size = 14) +
-  labs(x = "Trait", y = "%RMSE", fill = "Scenario") +
+  labs(x = "Trait prediction", y = "%RMSE", fill = "Scenario") +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.2))) +
-  scale_fill_discrete(labels = scenario_labels) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+  scale_fill_manual(values = transfer_fills, labels = scenario_labels) +
+  theme(axis.text.x = element_text(),
         legend.position = "bottom")
 
 ggarrange(plotlist = list(tc_a, tc_b), nrow = 2, ncol = 1, common.legend = TRUE)
